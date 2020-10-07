@@ -2,12 +2,13 @@ package java8;
 
 public class MyListener extends Java8BaseListener {
     @Override
-    public void enterForStatement(Java8Parser.ForStatementContext ctx) {
-        System.out.printf("I am visiting %s's for statement\n",ctx.getText());
+    public void enterAssignment(Java8Parser.AssignmentContext ctx) {
+        System.out.println(ctx.getText());
     }
 
     @Override
-    public void exitForStatement(Java8Parser.ForStatementContext ctx) {
-        System.out.printf("I am exiting %s's for statement\n",ctx.getText());
+    public void enterBlock(Java8Parser.BlockContext ctx) {
+        System.out.println(ctx.getText());
     }
+
 }

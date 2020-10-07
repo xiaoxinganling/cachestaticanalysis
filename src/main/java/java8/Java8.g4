@@ -200,7 +200,7 @@ packageName
 	|	packageName '.' Identifier
 	;
 
-typeName
+typeName//mx
 	:	Identifier
 	|	packageOrTypeName '.' Identifier
 	;
@@ -210,7 +210,7 @@ packageOrTypeName
 	|	packageOrTypeName '.' Identifier
 	;
 
-expressionName
+expressionName//mx
 	:	Identifier
 	|	ambiguousName '.' Identifier
 	;
@@ -352,7 +352,7 @@ variableDeclaratorList
 	;
 
 variableDeclarator
-	:	variableDeclaratorId ('=' variableInitializer)?
+	:	variableDeclaratorId ('=' variableInitializer)?// mx
 	;
 
 variableDeclaratorId
@@ -788,7 +788,7 @@ statementExpression
 	|	preDecrementExpression
 	|	postIncrementExpression
 	|	postDecrementExpression
-	|	methodInvocation
+	|	methodInvocation//mx
 	|	classInstanceCreationExpression
 	;
 
@@ -843,7 +843,7 @@ whileStatementNoShortIf
 	:	'while' '(' expression ')' statementNoShortIf
 	;
 
-doStatement
+ doStatement
 	:	'do' statement 'while' '(' expression ')' ';'
 	;
 
@@ -1193,7 +1193,7 @@ lambdaBody
 	;
 
 assignmentExpression
-	:	conditionalExpression
+	:	conditionalExpression//versus assignment??
 	|	assignment
 	;
 

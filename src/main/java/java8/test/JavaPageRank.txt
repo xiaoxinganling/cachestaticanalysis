@@ -96,7 +96,9 @@ public final class JavaPageRank {
 
         // Calculates and updates URL ranks continuously using PageRank algorithm.
         for (int current = 0; current < Integer.parseInt(args[1]); current++) {
+            // basicForStatement
             // Calculates URL contributions to the rank of other URLs.
+            // statementWithoutTrailingSubstatement->block->blockStatements
             JavaPairRDD<String, Double> contribs = links.join(ranks).values()
                     .flatMapToPair(s -> {
                         int urlCount = Iterables.size(s._1());
@@ -105,12 +107,37 @@ public final class JavaPageRank {
                             results.add(new Tuple2<>(n, s._2() / urlCount));
                         }
                         return results.iterator();
-                    });
+                    });//blockStatement -> localViriableDeclarationStatement
 
             // Re-calculates URL ranks based on neighbor contributions.
             ranks = contribs.reduceByKey(new Sum()).mapValues(sum -> 0.15 + sum * 0.85);
+			//blockStatement->statement->statementWithoutTrailingSubstatement
+            // ->!!expressionStatement!!->statementExpression
+			//->!!!!assignment->xxx=xxx
+        }
+		int i=0;
+        while (i++ < Integer.parseInt(args[1])) {
+            // basicForStatement
+            // Calculates URL contributions to the rank of other URLs.
+            // statementWithoutTrailingSubstatement->block->blockStatements
+            JavaPairRDD<String, Double> contribs = links.join(ranks).values()
+                    .flatMapToPair(s -> {
+                        int urlCount = Iterables.size(s._1());
+                        List<Tuple2<String, Double>> results = new ArrayList<>();
+                        for (String n : s._1) {
+                            results.add(new Tuple2<>(n, s._2() / urlCount));
+                        }
+                        return results.iterator();
+                    });//blockStatement -> localViriableDeclarationStatement
+
+            // Re-calculates URL ranks based on neighbor contributions.
+            ranks = contribs.reduceByKey(new Sum()).mapValues(sum -> 0.15 + sum * 0.85);
+			//blockStatement->statement->statementWithoutTrailingSubstatement
+            // ->!!expressionStatement!!->statementExpression
+			//->!!!!assignment->xxx=xxx
         }
         // mx add
+		ranks.mapValues(rs -> 1.0).collect();
         ranks.first();
         ranks.count();
         // mx add
