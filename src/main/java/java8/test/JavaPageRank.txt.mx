@@ -89,7 +89,7 @@ public final class JavaPageRank {
         JavaPairRDD<String, Iterable<String>> links = lines.mapToPair(s -> {
             String[] parts = SPACES.split(s);
             return new Tuple2<>(parts[0], parts[1]);
-        }).distinct().groupByKey();//.cache();
+        }).distinct().groupByKey().cache();//.cache();
 
         // Loads all URLs with other URL(s) link to from input file and initialize ranks of them to one.
         JavaPairRDD<String, Double> ranks = links.mapValues(rs -> 1.0);
@@ -138,6 +138,7 @@ public final class JavaPageRank {
         }
 		//ranks.cache();
         // mx add
+		ranks.cache();
 		ranks.mapValues(rs -> 1.0).collect();
 		//ranks.cache();
         ranks.first();

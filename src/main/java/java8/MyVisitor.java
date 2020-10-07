@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 // 自定义顺序的意思就是，如果我访问了这个，这里面的逻辑需要自己来写
 public class MyVisitor extends Java8BaseVisitor {
     // declared RDD
-    public List<Declaration> identifiers = new ArrayList<Declaration>();
+    public Map<String,Declaration> identifiers = new HashMap<String, Declaration>();
 
     // RDD reside left from the '='
     public List<List<Token>> left = new ArrayList<List<Token>>();
@@ -21,7 +21,7 @@ public class MyVisitor extends Java8BaseVisitor {
     public List<List<Token>> right = new ArrayList<List<Token>>();
 
     // RDD need to cache in iteration pattern
-    public List<Token> toCache = new ArrayList<Token>();
+    public List<CacheAdvice> toCache = new ArrayList<CacheAdvice>();
 
     // current iteration number
     private int isIteration = 0;
@@ -31,6 +31,9 @@ public class MyVisitor extends Java8BaseVisitor {
 
     // current RDD analysed in multi-action pattern
     private Token curRDD;
+
+    // the start of the first iteration
+    private List<Token> iterationFirst = new ArrayList<Token>();
 
     // Step 1. find all declared RDD：<type,name,line>
     @Override
@@ -53,7 +56,7 @@ public class MyVisitor extends Java8BaseVisitor {
                 }
             }
         }else{
-            if(isIteration == 0 && Pattern.matches(Main.pattern,type)) {
+            if(isIteration == 0 && Pattern.matches(CacheUtils.pattern,type)) {
                 if (type.indexOf('<') != -1) {
                     type = type.substring(0, type.indexOf('<'));
                 }
@@ -68,10 +71,12 @@ public class MyVisitor extends Java8BaseVisitor {
                             // variableDeclarator
                             //	:	variableDeclaratorId ('=' variableInitializer)?// mx
                             //	;
-                            // <type, id, line>
-                            identifiers.add(new Declaration(ctx.unannType().getText(),
-                                    variables.variableDeclarator(i).variableDeclaratorId().getText(),
-                                    ctx.start.getLine()));
+                            // (id, <type, id, line, cached>)
+                            String rddName = variables.variableDeclarator(i).variableDeclaratorId().getText();
+                            Java8Parser.VariableDeclaratorContext curLine = variables.variableDeclarator(i);
+                            // stop is good for add our code into the source code
+                            identifiers.put(rddName, new Declaration(ctx.unannType().getText(), rddName, ctx.stop.getLine(),
+                                    Pattern.matches(CacheUtils.cachePattern,variables.variableDeclarator(i).getText()),ctx.stop.getLine()));
                         }
                     }
                 } catch (ClassNotFoundException e) {
@@ -92,9 +97,11 @@ public class MyVisitor extends Java8BaseVisitor {
     @Override
     public Object visitForStatement(Java8Parser.ForStatementContext ctx) {
         if(ctx.getText().contains("=")){
+            iterationFirst.add(ctx.start);
             isIteration++;
             findIterationPattern(ctx.getChild(0));
             isIteration--;
+            iterationFirst.remove(iterationFirst.size()-1);
         }else{
             super.visitForStatement(ctx);
         }
@@ -104,9 +111,11 @@ public class MyVisitor extends Java8BaseVisitor {
     @Override
     public Object visitWhileStatement(Java8Parser.WhileStatementContext ctx) {
         if(ctx.getText().contains("=")){
+            iterationFirst.add(ctx.start);
             isIteration++;
             findIterationPattern(ctx);
             isIteration--;
+            iterationFirst.remove(iterationFirst.size()-1);
         }else{
             super.visitWhileStatement(ctx);
         }
@@ -114,7 +123,10 @@ public class MyVisitor extends Java8BaseVisitor {
     }
 
     private void findIterationPattern(ParseTree ctx){
-        if(right.size()<isIteration){
+        if(right.size()==isIteration) {
+            left.set(isIteration-1,new ArrayList<Token>());
+            right.set(isIteration-1,new ArrayList<Token>());
+        }else{
             left.add(new ArrayList<Token>());
             right.add(new ArrayList<Token>());
         }
@@ -123,10 +135,31 @@ public class MyVisitor extends Java8BaseVisitor {
                 statementWithoutTrailingSubstatement().block().blockStatements());
         System.out.println("==============================");
         for(Token t: filterRight(isIteration)){
-            if(!isDuplicate(toCache,t)){
-                toCache.add(t);
+            boolean isOccurred = false;
+            if(!(identifiers.get(t.getText()).cached&&
+                    identifiers.get(t.getText()).cacheLine<iterationFirst.get(0).getLine())){
+                for(int j=0;j<toCache.size();j++){
+                    CacheAdvice ca = toCache.get(j);
+                    if(ca.reason.getText().equals(t.getText())){
+                        // get the smaller
+                        isOccurred = true;
+                        if(ca.adviseLine > iterationFirst.get(0).getLine()){
+                            ca.adviseLine = iterationFirst.get(0).getLine();
+                            ca.reason = t;
+                            // toCache.set(j,ca); TODO: test it
+                        }
+                        break;
+                    }
+                }
+                if(!isOccurred){
+                    toCache.add(new CacheAdvice(t,iterationFirst.get(0).getLine(), CacheUtils.ITERATION));
+                }
+            }else{
+                System.out.println("cached!!!! "+t.getText());
             }
         }
+        left.remove(left.size()-1);
+        right.remove(right.size()-1);
     }
 
     // deal with expression in (local variable declaration | assignment) in for statement
@@ -388,7 +421,8 @@ public class MyVisitor extends Java8BaseVisitor {
                         Java8Parser.ExpressionNameContext.class == node.getClass())){
             // save variables declared before
             Token var = node.getTokens(102).get(0).getSymbol();
-            for(Declaration declare: identifiers){
+            for(String key : identifiers.keySet()){
+                Declaration declare = identifiers.get(key);
                 if(declare.identifier.equals(var.getText())){
                     addRight(isIteration,var);
                 }
@@ -399,23 +433,6 @@ public class MyVisitor extends Java8BaseVisitor {
                 dfsNode((ParserRuleContext) node.getChild(i),type);
             }
         }
-    }
-
-    // dfs to find the rdd name
-    private Token dfsNodeToFindRDD(ParserRuleContext node,int type){
-        if(node.getTokens(type).size()>0&&
-                node.getChild(0).getChildCount()==0&&
-                (Java8Parser.TypeNameContext.class == node.getClass()||
-                        Java8Parser.ExpressionNameContext.class == node.getClass())){
-            // save variables declared before
-            return node.getTokens(102).get(0).getSymbol();
-        }
-        for(int i=0;i<node.getChildCount();i++){
-            if(node.getChild(i).getChildCount()>0){
-                return dfsNodeToFindRDD((ParserRuleContext) node.getChild(i),type);
-            }
-        }
-        return null;
     }
 
     // add left candidate RDD
@@ -478,6 +495,12 @@ public class MyVisitor extends Java8BaseVisitor {
             }else if(ctx.Identifier()!=null){
                 judgeAction(ctx.Identifier().getText());
             }
+            if(Pattern.matches(CacheUtils.cachePattern,ctx.getText())
+            &&identifiers.containsKey(curRDD.getText())){
+                Declaration declaration = identifiers.get(curRDD.getText());
+                declaration.cacheLine = ctx.stop.getLine();
+                declaration.cached = true;
+            }
         }
         if(ctx.argumentList()!=null){
             super.visit(ctx.argumentList());
@@ -526,6 +549,23 @@ public class MyVisitor extends Java8BaseVisitor {
         return 0;
     }
 
+    // dfs to find the rdd name
+    private Token dfsNodeToFindRDD(ParserRuleContext node,int type){
+        if(node.getTokens(type).size()>0&&
+                node.getChild(0).getChildCount()==0&&
+                (Java8Parser.TypeNameContext.class == node.getClass()||
+                        Java8Parser.ExpressionNameContext.class == node.getClass())){
+            // save variables declared before
+            return node.getTokens(102).get(0).getSymbol();
+        }
+        for(int i=0;i<node.getChildCount();i++){
+            if(node.getChild(i).getChildCount()>0){
+                return dfsNodeToFindRDD((ParserRuleContext) node.getChild(i),type);
+            }
+        }
+        return null;
+    }
+    
     // add RDD's invoking action
     private void addRDDActionAppearance(RDDCallAction rddCallAction){
         String rddName = rddCallAction.rdd.get(0).getText();
@@ -545,7 +585,7 @@ public class MyVisitor extends Java8BaseVisitor {
 
     // to judge action
     private void judgeAction(String methodName){
-        if(Pattern.matches(Main.actionPattern,methodName)){
+        if(Pattern.matches(CacheUtils.actionPattern,methodName)){
             // is action
             List<Token> rdd = new ArrayList<Token>();
             rdd.add(curRDD);
@@ -557,9 +597,11 @@ public class MyVisitor extends Java8BaseVisitor {
     public void addMultiActionRDD(){
        for(String key: rddAppearance.keySet()){
            RDDCallAction rca = rddAppearance.get(key);
-           if(rca.times>=2){
+           if(rca.times>=2
+                   &&(!identifiers.get(rca.rdd.get(0).getText()).cached||
+                   identifiers.get(rca.rdd.get(0).getText()).cacheLine>rca.rdd.get(0).getLine())){
                // TODO: add which one???, the first one is the earliest one, it's ok currently
-               toCache.add(rca.rdd.get(0));
+               toCache.add(new CacheAdvice(rca.rdd.get(0),rca.rdd.get(0).getLine(), CacheUtils.MULTIACTION));
            }
        }
     }
@@ -605,10 +647,14 @@ class Declaration{
     public String type;
     public String identifier;
     public int line;
-    public Declaration(String type, String identifier, int line) {
+    public boolean cached;
+    public int cacheLine;
+    public Declaration(String type, String identifier, int line, boolean cached, int cacheLine) {
         this.type = type;
         this.identifier = identifier;
         this.line = line;
+        this.cached = cached;
+        this.cacheLine = cacheLine;
     }
 }
 
@@ -633,3 +679,13 @@ class RDDCallAction {
 }
 
 // cache advice
+class CacheAdvice{
+    public Token reason;
+    public int adviseLine;
+    public String type;
+    public CacheAdvice(Token reason, int adviseLine, String type) {
+        this.reason = reason;
+        this.adviseLine = adviseLine;
+        this.type = type;
+    }
+}
