@@ -35,6 +35,18 @@ public class MyVisitor extends Java8BaseVisitor {
     // the start of the first iteration
     private List<Token> iterationFirst = new ArrayList<Token>();
 
+    // TODO ensure current class is the class for analysis
+
+    public String curClass;
+//
+//    @Override
+//    public Object visitNormalClassDeclaration(Java8Parser.NormalClassDeclarationContext ctx) {
+//        if(ctx.Identifier().getText().equals(curClass)){
+//            //super.visitNormalClassDeclaration(ctx);
+//        }
+//        return super.visitNormalClassDeclaration(ctx);
+//    }
+
     // Step 1. find all declared RDD：<type,name,line>
     @Override
     public Object visitLocalVariableDeclaration(Java8Parser.LocalVariableDeclarationContext ctx){
@@ -46,7 +58,7 @@ public class MyVisitor extends Java8BaseVisitor {
             for(int i = 0; i < variables.getChildCount(); i++){
                 Java8Parser.VariableDeclaratorContext variable = variables.variableDeclarator(i);
                 if(variable.getText().contains("=")){
-                    System.out.println("(local var)left: "+variable.variableDeclaratorId().getText());
+                    //System.out.println("(local var)left: "+variable.variableDeclaratorId().getText());
                     addLeft(isIteration,variable.variableDeclaratorId().start);
                     // variableInitializer
                     //	:	expression :need to consider
@@ -85,7 +97,10 @@ public class MyVisitor extends Java8BaseVisitor {
             }
             // do action testing
             for (int i = 0; i < variables.getChildCount(); i++) {
-                if (variables.variableDeclarator(i).variableInitializer().expression() != null) {
+                // TODO NULL pointer error
+                // long oldCount;
+                if (variables.variableDeclarator(i).variableInitializer()!=null
+                &&variables.variableDeclarator(i).variableInitializer().expression() != null) {
                     visitExpression(variables.variableDeclarator(i).variableInitializer().expression());
                 }
             }
@@ -130,10 +145,10 @@ public class MyVisitor extends Java8BaseVisitor {
             left.add(new ArrayList<Token>());
             right.add(new ArrayList<Token>());
         }
-        System.out.println("==============================iteration "+ctx.getText());
+        //System.out.println("==============================iteration "+ctx.getText());
         visitBlockStatements(((Java8Parser.StatementContext)ctx.getChild(ctx.getChildCount()-1)).
                 statementWithoutTrailingSubstatement().block().blockStatements());
-        System.out.println("==============================");
+        //System.out.println("==============================");
         for(Token t: filterRight(isIteration)){
             boolean isOccurred = false;
             if(!(identifiers.get(t.getText()).cached&&
@@ -155,7 +170,7 @@ public class MyVisitor extends Java8BaseVisitor {
                     toCache.add(new CacheAdvice(t,iterationFirst.get(0).getLine(), CacheUtils.ITERATION));
                 }
             }else{
-                System.out.println("cached!!!! "+t.getText());
+                //System.out.println("cached!!!! "+t.getText());
             }
         }
         left.remove(left.size()-1);
@@ -212,7 +227,11 @@ public class MyVisitor extends Java8BaseVisitor {
         //	:	leftHandSide assignmentOperator expression
         //	;
         if(isIteration>0){
-            addLeft(isIteration,ctx.leftHandSide().expressionName().start);
+            // TODO: null point error
+            // w[i]=2*rand.nextDouble()-1;
+            if(ctx.leftHandSide().expressionName()!=null){
+                addLeft(isIteration,ctx.leftHandSide().expressionName().start);
+            }
             visitExpression(ctx.expression());
         }
         return 0;
@@ -279,7 +298,13 @@ public class MyVisitor extends Java8BaseVisitor {
                 // ifThenStatement :star
                     //	:	'if' '(' expression ')' statement
                     //	;
-                visitStatement(ctx.ifThenElseStatement().statement());
+                // TODO: NULL pointer error
+                // if (from != to) {
+                //        edges.add(e);
+                //      }
+                if(ctx.ifThenStatement().statement()!=null){
+                    visitStatement(ctx.ifThenStatement().statement());
+                }
             }else if(ctx.ifThenElseStatement()!=null){
                 // ifThenElseStatement :star
                     //	:	'if' '(' expression ')' statementNoShortIf 'else' statement
@@ -484,7 +509,7 @@ public class MyVisitor extends Java8BaseVisitor {
         //	|	primary '.' typeArguments? Identifier '(' argumentList? ')'
         //	|	'super' '.' typeArguments? Identifier '(' argumentList? ')'
         //	|	typeName '.' 'super' '.' typeArguments? Identifier '(' argumentList? ')'
-        System.out.println(ctx.getText());
+        //System.out.println(ctx.getText());
         if(needToJudgeAction(ctx.getText())){
             char first = ctx.getText().charAt(0);
             if(first!='.'){
@@ -512,7 +537,7 @@ public class MyVisitor extends Java8BaseVisitor {
         // methodInvocation_lf_primary
         //	:	'.' typeArguments? Identifier '(' argumentList? ')'
         //	;
-        System.out.println(ctx.getText());
+        //System.out.println(ctx.getText());
         if(needToJudgeAction(ctx.getText())){
             judgeAction(ctx.Identifier().getText());
         }
@@ -531,7 +556,7 @@ public class MyVisitor extends Java8BaseVisitor {
         //	|	'super' '.' typeArguments? Identifier '(' argumentList? ')'
         //	|	typeName '.' 'super' '.' typeArguments? Identifier '(' argumentList? ')'
         //	;
-        System.out.println(ctx.getText());
+        //System.out.println(ctx.getText());
         if(needToJudgeAction(ctx.getText())){
             char first = ctx.getText().charAt(0);
             if(first!='.'){

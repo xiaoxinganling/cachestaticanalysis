@@ -32,10 +32,16 @@ public class CacheUtils {
 //        System.out.println("generating results done!");
         // 使用Visitor进行遍历
         MyVisitor visitor = new MyVisitor();
+        String interval = "\\\\";
+        if(fileName.contains("/")){
+            interval = "/";
+        }
+        visitor.curClass = fileName.split(interval)[fileName.split(interval).length-1].split("\\.")[0];
         visitor.visit(tree);
+
         visitor.addMultiActionRDD();
         // test Work
-        testWork(visitor);
+        // testWork(visitor);
         // add our code into source code
         updateCode(fileName,convertToCache(visitor),fileName+".mx");
     }
@@ -66,7 +72,7 @@ public class CacheUtils {
             System.out.println(visitor.rddAppearance.get(key));
         }
         // print toCache
-        System.out.println("================toCache");
+        System.out.println("================toCache=================");
         for(CacheAdvice s:visitor.toCache){
             System.out.printf("<%s:%s, advisedLine: %s, cacheType: %s>\n",s.reason.getText(),
                     s.reason.getLine(),s.adviseLine,s.type);

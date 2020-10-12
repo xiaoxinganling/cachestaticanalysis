@@ -228,7 +228,7 @@ ambiguousName
  * Productions from §7 (Packages)
  */
 
-compilationUnit //this is what we need find
+compilationUnit
 	:	packageDeclaration? importDeclaration* typeDeclaration* EOF
 	;
 

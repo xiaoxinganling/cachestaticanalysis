@@ -83,6 +83,7 @@ public final class JavaTC {
     JavaPairRDD<Integer, Integer> edges = tc.mapToPair(e -> new Tuple2<>(e._2(), e._1()));
 
     long oldCount;
+    tc.cache();
     long nextCount = tc.count();
     do {
       oldCount = nextCount;
