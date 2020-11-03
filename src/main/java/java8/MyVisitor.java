@@ -109,12 +109,45 @@ public class MyVisitor extends Java8BaseVisitor {
     }
 
     // Step 2. find iteration pattern
+
+
+    @Override
+    public Object visitDoStatement(Java8Parser.DoStatementContext ctx) {
+        //  doStatement
+        //	:	'do' statement 'while' '(' expression ')' ';'
+        //	;
+        // forStatement
+        //	:	basicForStatement
+        //	|	enhancedForStatement
+        //	;
+        // basicForStatement
+        //	:	'for' '(' forInit? ';' expression? ';' forUpdate? ')' statement
+        //	;
+        // whileStatement
+        //	:	'while' '(' expression ')' statement
+        //	;
+        if(ctx.getText().contains("=")){
+            iterationFirst.add(ctx.start);
+            isIteration++;
+            findIterationPattern(ctx.statement());
+            isIteration--;
+            iterationFirst.remove(iterationFirst.size()-1);
+        }else{
+            super.visitDoStatement(ctx);
+        }
+        return 0;
+    }
+
     @Override
     public Object visitForStatement(Java8Parser.ForStatementContext ctx) {
         if(ctx.getText().contains("=")){
             iterationFirst.add(ctx.start);
             isIteration++;
-            findIterationPattern(ctx.getChild(0));
+            if(ctx.basicForStatement()!=null){
+                findIterationPattern(ctx.basicForStatement().statement());
+            }else{
+                findIterationPattern(ctx.enhancedForStatement().statement());
+            }
             isIteration--;
             iterationFirst.remove(iterationFirst.size()-1);
         }else{
@@ -128,7 +161,7 @@ public class MyVisitor extends Java8BaseVisitor {
         if(ctx.getText().contains("=")){
             iterationFirst.add(ctx.start);
             isIteration++;
-            findIterationPattern(ctx);
+            findIterationPattern(ctx.statement());
             isIteration--;
             iterationFirst.remove(iterationFirst.size()-1);
         }else{
@@ -137,7 +170,7 @@ public class MyVisitor extends Java8BaseVisitor {
         return 0;
     }
 
-    private void findIterationPattern(ParseTree ctx){
+    private void findIterationPattern(Java8Parser.StatementContext ctx){
         if(right.size()==isIteration) {
             left.set(isIteration-1,new ArrayList<Token>());
             right.set(isIteration-1,new ArrayList<Token>());
@@ -146,8 +179,9 @@ public class MyVisitor extends Java8BaseVisitor {
             right.add(new ArrayList<Token>());
         }
         //System.out.println("==============================iteration "+ctx.getText());
-        visitBlockStatements(((Java8Parser.StatementContext)ctx.getChild(ctx.getChildCount()-1)).
-                statementWithoutTrailingSubstatement().block().blockStatements());
+        visitBlockStatements(ctx.statementWithoutTrailingSubstatement().block().blockStatements());
+        //visitBlockStatements(((Java8Parser.StatementContext)ctx.getChild(ctx.getChildCount()-1)).
+        //        statementWithoutTrailingSubstatement().block().blockStatements());
         //System.out.println("==============================");
         for(Token t: filterRight(isIteration)){
             boolean isOccurred = false;

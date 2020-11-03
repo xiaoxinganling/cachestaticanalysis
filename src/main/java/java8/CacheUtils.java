@@ -41,7 +41,7 @@ public class CacheUtils {
 
         visitor.addMultiActionRDD();
         // test Work
-        // testWork(visitor);
+         testWork(visitor);
         // add our code into source code
         updateCode(fileName,convertToCache(visitor),fileName+".mx");
     }
