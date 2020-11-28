@@ -2,7 +2,7 @@ package java8;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
-import org.antlr.v4.runtime.tree.ParseTree;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -68,7 +68,7 @@ public class MyVisitor extends Java8BaseVisitor {
                 }
             }
         }else{
-            if(isIteration == 0 && Pattern.matches(CacheUtils.pattern,type)) {
+            if(isIteration == 0 && Pattern.matches(CacheUtils.RDDPATTERN,type)) {
                 if (type.indexOf('<') != -1) {
                     type = type.substring(0, type.indexOf('<'));
                 }
@@ -615,6 +615,7 @@ public class MyVisitor extends Java8BaseVisitor {
                 (Java8Parser.TypeNameContext.class == node.getClass()||
                         Java8Parser.ExpressionNameContext.class == node.getClass())){
             // save variables declared before
+            // **rdd name sometimes will be typename, some times will be expression name**
             return node.getTokens(102).get(0).getSymbol();
         }
         for(int i=0;i<node.getChildCount();i++){

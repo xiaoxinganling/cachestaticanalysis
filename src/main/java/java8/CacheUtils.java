@@ -11,7 +11,7 @@ import java.util.Map;
 public class CacheUtils {
     public static String ITERATION = "Iteration";
     public static String MULTIACTION = "MultiAction";
-    public static String pattern = "(Java)(Double|Hadoop|NewHadoop|Pair)?(RDD)(<.*>)?";
+    public static String RDDPATTERN = "(Java)(Double|Hadoop|NewHadoop|Pair)?(RDD)(<.*>)?";
     public static String actionPattern = "(((a|treeA)(ggregate))|((collect)(Async|Partitions)?)|((count)(Approx|ApproxDistinct|Async|ByKey|ByValue|ByValueApprox)?)|(first)|(fold)|((foreach)(Partition)?(Async)?)|(max)|(min)|((treeR|r)(educe))|((saveAs)(Object|Text|Sequence)(File))|((take)(Async|Ordered|Sample)?)|(top))";
     public static String cachePattern = ".*((cache\\(.*\\))|(persist\\(.*\\))).*";
     public void runAntlr(String fileName) throws Exception{
@@ -45,7 +45,33 @@ public class CacheUtils {
         // add our code into source code
         updateCode(fileName,convertToCache(visitor),fileName+".mx");
     }
+    // test whether our FindCacheCandidateVisitor is worked
+    public void runAntlrNewVisitor(String fileName) throws Exception{
+        // TODO: add test function
+        // 对每一个输入的字符串，构造一个 ANTLRStringStream 流 input
+        //ANTLRInputStream input = new ANTLRInputStream(new FileInputStream(fileName));
+        CharStream input = CharStreams.fromFileName(fileName);
+        // 用 in 构造词法分析器 lexer，词法分析的作用是将字符聚集成单词或者符号
+        Java8Lexer lexer = new Java8Lexer(input);
+        // 用词法分析器 lexer 构造一个记号流 tokens
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        // 再使用 tokens 构造语法分析器 parser,至此已经完成词法分析和语法分析的准备工作
+        Java8Parser parser = new Java8Parser(tokens);
+        // 最终调用语法分析器的规则 r（这个是我们在g4里面定义的那个规则），完成对表达式的验证
+        Java8Parser.CompilationUnitContext tree = parser.compilationUnit();
+        // 使用Visitor进行遍历
+        FindCacheCandidateVisitor fccVisitor = new FindCacheCandidateVisitor();
+        fccVisitor.visitCompilationUnit(tree);
+        // TODO: add these tests into functions
+        Map<String,List<RDD>> allRdds = fccVisitor.rdds;
+        for(String key :allRdds.keySet()){
+            for(RDD r:allRdds.get(key)){
+                System.out.print(r+" ");
+            }
+            System.out.println();
+        }
 
+    }
     // test whether the work is ok
     private void testWork(MyVisitor visitor){
         // 检验 step1

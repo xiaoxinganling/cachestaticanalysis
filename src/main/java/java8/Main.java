@@ -19,10 +19,11 @@ public class Main {
                 //|| fileName.equals("D:\\IDEAWorkspace\\CacheStaticAnalysis\\src\\main\\java\\java8\\test\\JavaKMeans.txt")
                 //|| fileName.equals("D:\\IDEAWorkspace\\CacheStaticAnalysis\\src\\main\\java\\java8\\test\\JavaGroupByTest.txt")
                 ){
-                    long startTime=System.currentTimeMillis();   //start Time
-                    new CacheUtils().runAntlr(fileName);
-                    long endTime=System.currentTimeMillis(); //获取结束时间
-                    System.out.println(fileName+": "+(endTime-startTime)+"ms");
+//                    long startTime=System.currentTimeMillis();   //start Time
+//                    new CacheUtils().runAntlr(fileName);
+//                    long endTime=System.currentTimeMillis(); //获取结束时间
+//                    System.out.println(fileName+": "+(endTime-startTime)+"ms");
+                    new CacheUtils().runAntlrNewVisitor(fileName);
                 }
             }
 
