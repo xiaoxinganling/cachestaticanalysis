@@ -12,9 +12,9 @@ public class Main {
             if(!file.isDirectory()){
                 String fileName = file.getAbsolutePath();
                 //System.out.println(fileName);
-                if(//fileName.equals("D:\\IDEAWorkspace\\CacheStaticAnalysis\\src\\main\\java\\java8\\test\\JavaPageRank.txt")
-                //|| fileName.equals("D:\\IDEAWorkspace\\CacheStaticAnalysis\\src\\main\\java\\java8\\test\\JavaHdfsLR.txt")
-                //||
+                if(fileName.equals("D:\\IDEAWorkspace\\CacheStaticAnalysis\\src\\main\\java\\java8\\test\\JavaPageRank.txt")
+                || fileName.equals("D:\\IDEAWorkspace\\CacheStaticAnalysis\\src\\main\\java\\java8\\test\\JavaHdfsLR.txt")
+                ||
                     fileName.equals("D:\\IDEAWorkspace\\CacheStaticAnalysis\\src\\main\\java\\java8\\test\\JavaTC.txt")
                 //|| fileName.equals("D:\\IDEAWorkspace\\CacheStaticAnalysis\\src\\main\\java\\java8\\test\\JavaKMeans.txt")
                 //|| fileName.equals("D:\\IDEAWorkspace\\CacheStaticAnalysis\\src\\main\\java\\java8\\test\\JavaGroupByTest.txt")
@@ -23,6 +23,7 @@ public class Main {
 //                    new CacheUtils().runAntlr(fileName);
 //                    long endTime=System.currentTimeMillis(); //获取结束时间
 //                    System.out.println(fileName+": "+(endTime-startTime)+"ms");
+                    System.out.println(fileName);
                     new CacheUtils().runAntlrNewVisitor(fileName);
                 }
             }
