@@ -62,6 +62,7 @@ public class CacheUtils {
         // 使用Visitor进行遍历
         FindCacheCandidateVisitor fccVisitor = new FindCacheCandidateVisitor();
         fccVisitor.visitCompilationUnit(tree);
+        List<RDD> toBeCache = fccVisitor.findToBeCache();
         // TODO: add these tests into functions
         Map<String,List<RDD>> allRdds = fccVisitor.rdds;
         for(String key :allRdds.keySet()){
@@ -70,7 +71,10 @@ public class CacheUtils {
             }
             System.out.println();
         }
-
+        System.out.println("==================***===================");
+        for(RDD r:toBeCache){
+            System.out.println(r.toString());
+        }
     }
     // test whether the work is ok
     private void testWork(MyVisitor visitor){

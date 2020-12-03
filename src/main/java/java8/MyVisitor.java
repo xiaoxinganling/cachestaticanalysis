@@ -123,8 +123,19 @@ public class MyVisitor extends Java8BaseVisitor {
         // basicForStatement
         //	:	'for' '(' forInit? ';' expression? ';' forUpdate? ')' statement
         //	;
+        // enhancedForStatement
+        //	:	'for' '(' variableModifier* unannType variableDeclaratorId ':' expression ')' statement
+        //	;
         // whileStatement
         //	:	'while' '(' expression ')' statement
+        //	;
+        //statement
+        //	:	statementWithoutTrailingSubstatement
+        //	|	labeledStatement
+        //	|	ifThenStatement
+        //	|	ifThenElseStatement
+        //	|	whileStatement
+        //	|	forStatement
         //	;
         if(ctx.getText().contains("=")){
             iterationFirst.add(ctx.start);
