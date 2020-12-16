@@ -12,6 +12,8 @@ import java.util.regex.Pattern;
 public class FindCacheCandidateVisitor extends Java8BaseVisitor{
     // mark all RDDs
     public Map<String, List<RDD>> rdds = new HashMap<String, List<RDD>>();
+    // save all actions with the timeline
+    public List<Token> actions = new ArrayList<Token>();
 
     // deal with local variable declaration
     @Override
@@ -25,12 +27,13 @@ public class FindCacheCandidateVisitor extends Java8BaseVisitor{
                 Java8Parser.VariableDeclaratorContext var = vars.variableDeclarator(i);
                 String id = var.variableDeclaratorId().getText();
                 int line = ctx.start.getLine();
-                addRDD(new RDD(id,line,0,-1));
+                RDD left = new RDD(id,line,0,-1);
                 // find the RDDs in the right of `=`
                 List<Token> tks = dfsToFindRDDs(var.variableInitializer(),102);
                 for(Token t: tks){
-                    updateRDD(t.getText());
+                    updateRDD(t.getText(),left);
                 }
+                addRDD(left);
                 if(var.variableInitializer()!=null){
                     super.visitVariableInitializer(var.variableInitializer());
                 }
@@ -44,27 +47,27 @@ public class FindCacheCandidateVisitor extends Java8BaseVisitor{
     public Object visitAssignment(Java8Parser.AssignmentContext ctx) {
         if(ctx.leftHandSide().expressionName()!=null&&
         isContained(ctx.leftHandSide().getText())){
+            RDD left = new RDD(ctx.leftHandSide().getText(),ctx.start.getLine(),
+                    0,-1);
             // firstly update parent
             List<Token> tks = dfsToFindRDDs(ctx.expression(),102);
-            for(Token t:tks){
-                updateRDD(t.getText());
+            for(Token t:tks) {
+                updateRDD(t.getText(), left);
             }
-            RDD tmp = new RDD(ctx.leftHandSide().getText(),ctx.start.getLine(),
-                    0,-1);
-            addRDD(tmp);
+            addRDD(left);
             return super.visitExpression(ctx.expression());
         }
         return super.visitAssignment(ctx);
     }
 
-    // deal with action
-
+    // start dealing with action
     @Override
     public Object visitMethodInvocation(Java8Parser.MethodInvocationContext ctx) {
         if(ctx.Identifier()!=null&&
                 Pattern.matches(CacheUtils.actionPattern,ctx.Identifier().getText())){
             // need to update RDD
-            updateRDDsInTree((ParserRuleContext) ctx.getChild(0));
+            updateRDDsInTree((ParserRuleContext) ctx.getChild(0),ctx.Identifier().getSymbol());
+            addAction(ctx.Identifier().getSymbol());
             return 0;// TODO: need to concern about other items of `MethodInvocation`
         }
         return super.visitMethodInvocation(ctx);
@@ -74,7 +77,8 @@ public class FindCacheCandidateVisitor extends Java8BaseVisitor{
     public Object visitMethodInvocation_lf_primary(Java8Parser.MethodInvocation_lf_primaryContext ctx) {
         if(Pattern.matches(CacheUtils.actionPattern,ctx.Identifier().getText())){
             if(Java8Parser.PrimaryContext.class == ctx.getParent().getParent().getClass()){
-                updateRDDsInTree(ctx.getParent().getParent());
+                updateRDDsInTree(ctx.getParent().getParent(),ctx.Identifier().getSymbol());
+                addAction(ctx.Identifier().getSymbol());
                 return 0;
             }
         }
@@ -86,14 +90,18 @@ public class FindCacheCandidateVisitor extends Java8BaseVisitor{
         if(ctx.Identifier()!=null&&
                 Pattern.matches(CacheUtils.actionPattern,ctx.Identifier().getText())){
             // need to update RDD
-            updateRDDsInTree((ParserRuleContext) ctx.getChild(0));
+            updateRDDsInTree((ParserRuleContext) ctx.getChild(0),ctx.Identifier().getSymbol());
+            addAction(ctx.Identifier().getSymbol());
             return 0;// TODO: need to concern about other items of `MethodInvocation`
         }
         return super.visitMethodInvocation_lfno_primary(ctx);
     }
+    private void addAction(Token action){
+        actions.add(action);
+    }
+    // end dealing action
 
     // deal with iteration
-
     @Override
     public Object visitDoStatement(Java8Parser.DoStatementContext ctx) {
         super.visitDoStatement(ctx);
@@ -119,22 +127,66 @@ public class FindCacheCandidateVisitor extends Java8BaseVisitor{
             List<RDD> tmp = rdds.get(key);
             RDD last = null;
             for(RDD rdd: tmp){
-                if(last==null||!(last.id.equals(rdd.id)&&last.line==rdd.line)){
+                // TODO: need to remove duplication?
+                //if(last==null||!(last.id.equals(rdd.id)&&last.line==rdd.line)){
                     if(rdd.outgoingEdge>=2){
                         res.add(rdd);
                         last = rdd;
                     }
-                }
+                //}
             }
         }
         return res;
     }
+    // use dfs to determine an RDD's subsequent actions
+    public void findAfterAction(List<RDD> candidates){
+        for(RDD curCache: candidates){
+            Map<String,Integer> rddMap = new HashMap<String,Integer>();
+            dfsRDD(curCache,curCache,rddMap);
+        }
+    }
+    // do the dfs
+    private void dfsRDD(RDD curRDD,RDD toBeUpdate, Map<String,Integer> rddMap){
+        if(hasVisited(rddMap,curRDD)){
+            return;
+        }
+        if(curRDD.isAction!=null){
+            toBeUpdate.actions.add(curRDD.isAction);
+        }else{
+            for(RDD child: curRDD.children){
+                dfsRDD(child,toBeUpdate,rddMap);
+            }
+        }
+        markVisited(rddMap,curRDD);
+    }
+    // to judge whether the RDD has been visited
+    private boolean hasVisited(Map<String,Integer> rddMap, RDD curRDD){
+        String key = curRDD.id + "_" +
+                curRDD.line + "_" +
+                curRDD.iteration;
+        return rddMap.containsKey(key);
+    }
+    // to mark the node has been visited
+    private void markVisited(Map<String,Integer> rddMap, RDD curRDD){
+        if(curRDD.isAction!=null){
+            return;
+        }
+        String key = curRDD.id + "_" +
+                curRDD.line + "_" +
+                curRDD.iteration;
+        if(!hasVisited(rddMap,curRDD)){
+            rddMap.put(key,1);
+        }
+    }
 
     // update RDD in an parseTree
-    private void updateRDDsInTree(ParserRuleContext tree){
+    private void updateRDDsInTree(ParserRuleContext tree,Token action){
         List<Token> tks = dfsToFindRDDs(tree,102);
+        // use id='0' to indicate the RDD is an action
+        RDD curAction = new RDD("0"+action.getText(),action.getLine(),0,0);
+        curAction.isAction = action;
         for(Token t: tks){
-            updateRDD(t.getText());
+            updateRDD(t.getText(),curAction);
         }
     }
 
@@ -142,6 +194,12 @@ public class FindCacheCandidateVisitor extends Java8BaseVisitor{
     private void addRDD(RDD cur){
         String key = cur.id;
         if(rdds.containsKey(key)){
+            // we need to update RDD's iteration
+            List<RDD> tmp = rdds.get(key);
+            RDD last = tmp.get(tmp.size()-1);
+            if(last.id.equals(cur.id) && last.line==cur.line){
+                cur.iteration = last.iteration+1;
+            }
             rdds.get(key).add(cur);
         }else{
             List<RDD> tmp = new ArrayList<RDD>();
@@ -150,11 +208,24 @@ public class FindCacheCandidateVisitor extends Java8BaseVisitor{
         }
     }
 
-    // update RDD's outgoing edges
-    private void updateRDD(String id){
-        if(rdds.containsKey(id)){
-            List<RDD> tmp = rdds.get(id);
-            tmp.get(tmp.size()-1).outgoingEdge++;
+    // update RDD's outgoing edges and children
+    private void updateRDD(String source, RDD child){
+        if(rdds.containsKey(source)){
+            List<RDD> tmp = rdds.get(source);
+            RDD sourceRDD = tmp.get(tmp.size()-1);
+            sourceRDD.outgoingEdge++;
+            // TODO :we need to remove duplicate children
+            // however it may cause confusion
+//            boolean isDuplicate = false;
+//            for(RDD curChild : sourceRDD.children){
+//                if(curChild.equals(child)){
+//                    isDuplicate = true;
+//                }
+//            }
+//            if(!isDuplicate){
+//                sourceRDD.children.add(child);
+//            }
+            sourceRDD.children.add(child);
         }
     }
 
@@ -194,16 +265,36 @@ class RDD{
     public int outgoingEdge;
     public int iteration; // TODO: iteration will be helpful in near future
     // TODO: update cache candidate's actions
+    public List<RDD> children;
+    public Token isAction;// TODO: we can't bear such ugly method to add action to an RDD
+    public List<Token> actions;
     public RDD(String id, int line, int outgoingEdge, int iteration) {
         this.id = id;
         this.line = line;
         this.outgoingEdge = outgoingEdge;
         this.iteration = iteration;
+        this.children = new ArrayList<RDD>();
+        this.actions = new ArrayList<Token>();
+        this.isAction = null;
     }
 
     @Override
     public String toString() {
-        return String.format("<id: %s, line: %d, outgoing Line: %d, iteration: %d>"
-                ,id,line, outgoingEdge,iteration);
+        StringBuilder children = new StringBuilder();
+        children.append("[");
+        for(RDD child:this.children){
+            children.append(child.id).append("_").append(child.line).append(",");
+        }
+        children.deleteCharAt(children.length()-1);
+        children.append("]");
+        StringBuilder actions = new StringBuilder();
+        actions.append("[");
+        for(Token action:this.actions){
+            actions.append(action.getText()).append("_").append(action.getLine()).append(",");
+        }
+        actions.deleteCharAt(actions.length()-1);
+        actions.append("]");
+        return String.format("<id: %s, line: %d, outgoing Line: %d, iteration: %d, children: %s, isAction: %s, actions: %s>"
+                ,id,line, outgoingEdge,iteration,children.toString(),isAction,actions.toString());
     }
 }

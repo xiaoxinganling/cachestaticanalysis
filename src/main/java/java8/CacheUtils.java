@@ -4,6 +4,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Token;
 import java.io.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +63,19 @@ public class CacheUtils {
         // 使用Visitor进行遍历
         FindCacheCandidateVisitor fccVisitor = new FindCacheCandidateVisitor();
         fccVisitor.visitCompilationUnit(tree);
+        // start testing action set
+        List<Token> actions = fccVisitor.actions;
+        for(Token action: actions){
+            System.out.printf("<%s,%d>\n",action.getText(),action.getLine());
+        }
+        // stop testing action set
+
+
         List<RDD> toBeCache = fccVisitor.findToBeCache();
+
+        // find each candidate RDD's actions
+        fccVisitor.findAfterAction(toBeCache);
+
         // TODO: add these tests into functions
         Map<String,List<RDD>> allRdds = fccVisitor.rdds;
         for(String key :allRdds.keySet()){
@@ -75,6 +88,8 @@ public class CacheUtils {
         for(RDD r:toBeCache){
             System.out.println(r.toString());
         }
+
+
     }
     // test whether the work is ok
     private void testWork(MyVisitor visitor){
